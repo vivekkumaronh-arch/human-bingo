@@ -10,11 +10,88 @@ interface ChallengeCardProps {
   onPreviewPhoto: (challengeId: number) => void;
 }
 
-// Ultra-subtle corporate pastel washes rotating cleanly across the 9 cards
-const CARD_TINTS = [
-  'bg-gradient-to-b from-white to-[#F7FAFD]', // subtle navy tint
-  'bg-gradient-to-b from-white to-[#F3FAF9]', // subtle teal tint
-  'bg-gradient-to-b from-white to-[#FDF7F5]', // subtle coral tint
+interface TileTheme {
+  gradient: string;
+  orbColor: string;
+  wavePrimary: string;
+  waveSecondary: string;
+  variant: 0 | 1 | 2;
+}
+
+// Nine muted pastel tile palettes: peach, sage, golden yellow, dusty blue, terracotta, lavender, warm beige, soft teal, warm rose-sand
+const TILE_THEMES: TileTheme[] = [
+  {
+    // 01: Muted Peach
+    gradient: 'bg-gradient-to-br from-[#FCE3D2] via-[#F8D3BC] to-[#F1BEA0]',
+    orbColor: 'bg-[#FFF5EE]/70',
+    wavePrimary: 'rgba(255, 248, 243, 0.55)',
+    waveSecondary: 'rgba(229, 146, 108, 0.28)',
+    variant: 0,
+  },
+  {
+    // 02: Sage Green
+    gradient: 'bg-gradient-to-br from-[#E2EDE4] via-[#CFE2D3] to-[#B8D1BE]',
+    orbColor: 'bg-[#F5FAF6]/75',
+    wavePrimary: 'rgba(247, 252, 248, 0.58)',
+    waveSecondary: 'rgba(116, 158, 128, 0.25)',
+    variant: 1,
+  },
+  {
+    // 03: Golden Yellow
+    gradient: 'bg-gradient-to-br from-[#FBF0CC] via-[#F7E3AC] to-[#EED082]',
+    orbColor: 'bg-[#FFFDF2]/75',
+    wavePrimary: 'rgba(255, 252, 240, 0.58)',
+    waveSecondary: 'rgba(212, 166, 62, 0.24)',
+    variant: 2,
+  },
+  {
+    // 04: Dusty Blue
+    gradient: 'bg-gradient-to-br from-[#DDE8F3] via-[#CBDCF0] to-[#B2CAE2]',
+    orbColor: 'bg-[#F5F9FD]/75',
+    wavePrimary: 'rgba(246, 250, 255, 0.58)',
+    waveSecondary: 'rgba(104, 142, 184, 0.24)',
+    variant: 1,
+  },
+  {
+    // 05: Terracotta
+    gradient: 'bg-gradient-to-br from-[#F4D6CB] via-[#EAC1B2] to-[#DDA693]',
+    orbColor: 'bg-[#FDF4F0]/70',
+    wavePrimary: 'rgba(255, 245, 241, 0.52)',
+    waveSecondary: 'rgba(196, 104, 78, 0.25)',
+    variant: 2,
+  },
+  {
+    // 06: Lavender
+    gradient: 'bg-gradient-to-br from-[#EAE3F6] via-[#DDD2EE] to-[#C8BAE0]',
+    orbColor: 'bg-[#F9F6FE]/75',
+    wavePrimary: 'rgba(250, 247, 255, 0.56)',
+    waveSecondary: 'rgba(138, 118, 178, 0.24)',
+    variant: 0,
+  },
+  {
+    // 07: Warm Beige
+    gradient: 'bg-gradient-to-br from-[#F3EADF] via-[#EAE0CF] to-[#DCD0B9]',
+    orbColor: 'bg-[#FCF9F4]/75',
+    wavePrimary: 'rgba(255, 252, 247, 0.58)',
+    waveSecondary: 'rgba(176, 152, 118, 0.24)',
+    variant: 2,
+  },
+  {
+    // 08: Soft Dusty Teal
+    gradient: 'bg-gradient-to-br from-[#DCEEEB] via-[#C9E3DF] to-[#B0D4CE]',
+    orbColor: 'bg-[#F4FBFA]/75',
+    wavePrimary: 'rgba(245, 252, 251, 0.58)',
+    waveSecondary: 'rgba(72, 148, 140, 0.24)',
+    variant: 0,
+  },
+  {
+    // 09: Muted Coral Rose
+    gradient: 'bg-gradient-to-br from-[#F9E1DC] via-[#F2CCC5] to-[#E6B3AA]',
+    orbColor: 'bg-[#FFF6F4]/75',
+    wavePrimary: 'rgba(255, 247, 245, 0.55)',
+    waveSecondary: 'rgba(212, 114, 98, 0.24)',
+    variant: 1,
+  },
 ];
 
 export const ChallengeCard: React.FC<ChallengeCardProps> = ({
@@ -66,21 +143,19 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
   };
 
   const isCompleted = Boolean(photo);
-  const tintClass = CARD_TINTS[(challenge.id - 1) % CARD_TINTS.length];
-  const numberAccentClass =
-    (challenge.id - 1) % 3 === 2 ? 'text-[#D96D57]' : 'text-[#258A83]';
+  const theme = TILE_THEMES[(challenge.id - 1) % TILE_THEMES.length];
 
   return (
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative aspect-[1/1.16] sm:aspect-square w-full overflow-hidden rounded-xl sm:rounded-2xl border transition-all duration-150 ${
+      className={`relative aspect-[1/1.16] sm:aspect-square w-full overflow-hidden rounded-lg sm:rounded-xl transition-all duration-150 ${
         isDragging
-          ? 'border-[#258A83] ring-2 ring-[#258A83]/25 bg-[#F3FAF9]'
+          ? 'ring-2 ring-[#258A83] scale-[0.99]'
           : isCompleted
-            ? 'border-[#258A83]/60 bg-white shadow-[0_3px_12px_rgba(20,43,73,0.08)]'
-            : `border-[#DCE3EC] ${tintClass} hover:border-[#258A83]/60 shadow-[0_2px_8px_rgba(20,43,73,0.04)]`
+            ? 'bg-white shadow-[0_2px_8px_rgba(20,43,73,0.12)] ring-1 ring-black/5'
+            : `${theme.gradient} shadow-[0_2px_6px_rgba(20,43,73,0.06)] ring-1 ring-black/[0.05] hover:shadow-[0_4px_12px_rgba(20,43,73,0.1)]`
       }`}
     >
       {/* Independent local file input supporting both camera and gallery on mobile */}
@@ -94,13 +169,13 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
       />
 
       {isProcessing ? (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-[#142B49]/70 p-2 bg-white">
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-[#142B49]/75 p-2 bg-white/80">
           <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-[#258A83]" aria-hidden="true" />
           <span className="text-[10px] sm:text-xs font-medium">Loading…</span>
         </div>
       ) : photo ? (
         <>
-          {/* Full-bleed cropped photo */}
+          {/* Full-bleed cropped photo replacing the illustrated background */}
           <button
             type="button"
             onClick={() => onPreviewPhoto(challenge.id)}
@@ -113,16 +188,16 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
             />
-            {/* Refined deep navy scrim for crisp white text readability */}
+            {/* Elegant bottom dark scrim for question legibility */}
             <div
-              className="absolute inset-0 bg-gradient-to-t from-[#0D1E35]/90 via-[#0D1E35]/40 to-[#0D1E35]/10 pointer-events-none"
+              className="absolute inset-0 bg-gradient-to-t from-[#0D1E35]/88 via-[#0D1E35]/35 to-transparent pointer-events-none"
               aria-hidden="true"
             />
           </button>
 
           {/* Top-left numbered indicator */}
           <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 pointer-events-none">
-            <span className="inline-flex items-center gap-0.5 rounded-md bg-[#142B49]/80 backdrop-blur-xs px-1.5 py-0.5 text-[9px] sm:text-[11px] font-bold tabular-nums text-white border border-white/15">
+            <span className="inline-flex items-center gap-0.5 rounded-md bg-[#142B49]/78 backdrop-blur-xs px-1.5 py-0.5 text-[9px] sm:text-[11px] font-bold tabular-nums text-white border border-white/15">
               <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#4FD1C5] stroke-[2.75]" aria-hidden="true" />
               {challenge.numberLabel}
             </span>
@@ -164,30 +239,72 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
           </div>
         </>
       ) : (
-        /* Entire card/upload area clickable */
+        /* Illustrated Pastel Tile (Before Uploading) */
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           aria-label={`Challenge ${challenge.id}: ${challenge.prompt}. Add photo.`}
-          className="w-full h-full p-1.5 sm:p-3 flex flex-col justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#258A83] focus-visible:ring-inset cursor-pointer group"
+          className="relative w-full h-full p-1.5 sm:p-3 flex flex-col justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#142B49] focus-visible:ring-inset cursor-pointer group overflow-hidden"
         >
+          {/* Decorative circular element near the top */}
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute top-1.5 right-1.5 sm:top-2.5 sm:right-2.5 w-5 h-5 sm:w-8 sm:h-8 rounded-full ${theme.orbColor} transition-transform duration-200 group-hover:scale-110`}
+          />
+
+          {/* Subtle abstract semicircle / curved shapes near the bottom */}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 120 56"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-x-0 bottom-0 w-full h-[46%]"
+          >
+            {theme.variant === 0 && (
+              <>
+                <path
+                  d="M0,56 L0,30 Q36,6 82,28 T120,22 L120,56 Z"
+                  fill={theme.waveSecondary}
+                />
+                <circle cx="60" cy="58" r="36" fill={theme.wavePrimary} />
+              </>
+            )}
+            {theme.variant === 1 && (
+              <>
+                <circle cx="28" cy="56" r="34" fill={theme.waveSecondary} />
+                <path
+                  d="M0,56 L0,36 Q62,8 120,34 L120,56 Z"
+                  fill={theme.wavePrimary}
+                />
+              </>
+            )}
+            {theme.variant === 2 && (
+              <>
+                <circle cx="92" cy="54" r="34" fill={theme.waveSecondary} />
+                <path
+                  d="M0,56 L0,24 Q50,42 120,18 L120,56 Z"
+                  fill={theme.wavePrimary}
+                />
+              </>
+            )}
+          </svg>
+
           {/* Numbered indicator + Question */}
-          <div className="flex flex-col gap-0.5 sm:gap-1">
-            <span className={`text-[9.5px] sm:text-xs font-bold tabular-nums leading-none ${numberAccentClass}`}>
+          <div className="relative z-10 flex flex-col gap-0.5 sm:gap-1">
+            <span className="text-[9.5px] sm:text-xs font-bold tabular-nums leading-none text-[#142B49]/70">
               {challenge.numberLabel}
             </span>
-            <p className="text-[9.5px] leading-[1.22] sm:text-xs md:text-[13px] sm:leading-snug font-semibold text-[#142B49]">
+            <p className="text-[9.5px] leading-[1.2] sm:text-xs md:text-[13px] sm:leading-snug font-semibold text-[#142B49]">
               {challenge.prompt}
             </p>
           </div>
 
-          {/* Compact upload area */}
-          <div className="w-full rounded-lg border border-dashed border-[#CBD6E4] group-hover:border-[#258A83] bg-white/80 group-hover:bg-[#258A83]/[0.06] py-1.5 sm:py-2.5 px-1 flex items-center justify-center gap-1 sm:gap-1.5 transition-colors">
+          {/* Compact Add Photo upload pill */}
+          <div className="relative z-10 w-full rounded-lg border border-white/80 bg-white/70 group-hover:bg-white/90 backdrop-blur-[2px] py-1.5 sm:py-2 px-1 flex items-center justify-center gap-1 sm:gap-1.5 transition-colors shadow-[0_1px_4px_rgba(20,43,73,0.06)]">
             <Camera
-              className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#258A83] shrink-0"
+              className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#142B49] shrink-0"
               aria-hidden="true"
             />
-            <span className="text-[9px] sm:text-[11px] font-semibold text-[#142B49]/85 group-hover:text-[#258A83] whitespace-nowrap leading-none transition-colors">
+            <span className="text-[9px] sm:text-[11px] font-semibold text-[#142B49] whitespace-nowrap leading-none">
               Add Photo
             </span>
           </div>

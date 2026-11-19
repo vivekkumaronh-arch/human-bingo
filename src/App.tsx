@@ -177,9 +177,21 @@ export default function App() {
           </div>
         )}
 
-        {/* 3x3 Networking Challenge Upload Grid */}
-        <main>
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-3.5">
+        {/* Warm Cream / Ivory 3x3 Human Bingo Board */}
+        <main className="rounded-2xl sm:rounded-3xl bg-[#FBF6EE] border border-[#EAE0CF] p-2 sm:p-3.5 shadow-[0_10px_30px_rgba(20,43,73,0.07)]">
+          <div className="flex items-center justify-between gap-2 px-0.5 mb-1.5 sm:mb-2.5">
+            <span className="text-[9.5px] sm:text-[11px] font-bold tracking-[0.16em] text-[#7D6E5D]">
+              BINGO BOARD
+            </span>
+            <span
+              className="inline-flex items-center rounded-full bg-[#E25546] px-2 py-0.5 text-[9.5px] sm:text-[11px] font-bold tracking-wider text-white tabular-nums shadow-[0_1px_4px_rgba(226,85,70,0.3)]"
+              aria-live="polite"
+            >
+              {uploadedCount}/{CHALLENGES.length} FILLED
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
             {CHALLENGES.map((challenge) => (
               <ChallengeCard
                 key={challenge.id}

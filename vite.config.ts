@@ -14,7 +14,7 @@ export default defineConfig(() => {
       // in production builds. Do not remove.
       {
         name: 'copy-unbundled-src-assets',
-        apply: 'build',
+        apply: 'build' as const,
         closeBundle(error?: Error): void {
           if (error) {
             return;
