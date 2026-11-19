@@ -1,0 +1,6 @@
+{
+  "name": "Find Someone Who – 9 Photo Challenge",
+  "description": "A mobile-friendly 3×3 social icebreaker photo challenge. Complete all 9 prompts locally in your browser and show your completed grid to the organiser.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
