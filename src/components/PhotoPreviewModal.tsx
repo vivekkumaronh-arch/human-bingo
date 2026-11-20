@@ -69,7 +69,7 @@ export const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
         <div className="flex items-start justify-between gap-3 px-4 py-3.5 border-b border-[#DCE3EC]">
           <div>
             <span className="text-xs font-bold tabular-nums text-[#258A83]">
-              Challenge {challenge.numberLabel}
+              {challenge.numberLabel} · {challenge.headline}
             </span>
             <h3
               id="preview-dialog-title"

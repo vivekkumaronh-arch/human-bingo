@@ -1,6 +1,7 @@
 export interface ChallengeItem {
   id: number;
   numberLabel: string;
+  headline: string;
   prompt: string;
   shortPrompt: string;
 }
@@ -17,55 +18,64 @@ export const CHALLENGES: ChallengeItem[] = [
   {
     id: 1,
     numberLabel: '01',
-    prompt: 'Find someone who shares your birth month.',
-    shortPrompt: 'Same birth month?',
+    headline: 'Birthday Twin',
+    prompt: 'Find someone born in the same month as you.',
+    shortPrompt: 'Birthday Twin',
   },
   {
     id: 2,
     numberLabel: '02',
-    prompt: 'Find someone who loves travelling.',
-    shortPrompt: 'Loves travelling?',
+    headline: 'Colour Connection',
+    prompt: 'Find someone wearing the same dominant colour as you.',
+    shortPrompt: 'Colour Connection',
   },
   {
     id: 3,
     numberLabel: '03',
-    prompt: 'Find someone who shares your favourite hobby.',
-    shortPrompt: 'Same favourite hobby?',
+    headline: 'Fellow Facilitator',
+    prompt: 'Find someone who shares the same professional profile as yours.',
+    shortPrompt: 'Fellow Facilitator',
   },
   {
     id: 4,
     numberLabel: '04',
-    prompt: 'Find someone who speaks three languages.',
-    shortPrompt: 'Speaks 3 languages?',
+    headline: 'Same, Same, But Different',
+    prompt: 'Find someone whose first name starts with the same letter as yours.',
+    shortPrompt: 'Same, Same, But Different',
   },
   {
     id: 5,
     numberLabel: '05',
-    prompt: 'Find someone whose favourite food matches yours.',
-    shortPrompt: 'Same favourite food?',
+    headline: 'The Learning Bug',
+    prompt: 'Find someone who recently learned a completely new skill.',
+    shortPrompt: 'The Learning Bug',
   },
   {
     id: 6,
     numberLabel: '06',
-    prompt: 'Find someone from your hometown.',
-    shortPrompt: 'From your hometown?',
+    headline: 'Passport Pals',
+    prompt: 'Find someone who loves travelling as much as you do.',
+    shortPrompt: 'Passport Pals',
   },
   {
     id: 7,
     numberLabel: '07',
-    prompt: 'Find someone who shares your favourite colour.',
-    shortPrompt: 'Same favourite colour?',
+    headline: 'Passion Match',
+    prompt: 'Find someone who shares your favourite hobby.',
+    shortPrompt: 'Passion Match',
   },
   {
     id: 8,
     numberLabel: '08',
-    prompt: 'Find someone who has the same birthday date as you.',
-    shortPrompt: 'Same birthday date?',
+    headline: 'Polyglot Pro',
+    prompt: 'Find someone who can speak three or more languages.',
+    shortPrompt: 'Polyglot Pro',
   },
   {
     id: 9,
     numberLabel: '09',
-    prompt: 'Find someone you met for the first time today.',
-    shortPrompt: 'New friend today?',
+    headline: 'Roots & Routes',
+    prompt: 'Find someone from your hometown (or who has lived there).',
+    shortPrompt: 'Roots & Routes',
   },
 ];
