@@ -5,6 +5,7 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  Clock,
   Copy,
   History,
   KeyRound,
@@ -19,24 +20,43 @@ import {
 import {
   formatDuration,
   formatRankOrdinal,
+  getEffectiveEventStatus,
   rankCompletedParticipants,
 } from '../services/bingoApi';
-import type { ManagedEventSummary, ParticipantRecord } from '../types/multiplayer';
+import type {
+  ManagedEventSummary,
+  OrganiserGallerySubmission,
+  ParticipantRecord,
+  VerificationStatus,
+} from '../types/multiplayer';
+import { OrganiserPhotoGallery } from './OrganiserPhotoGallery';
+import { EventExpiryCountdown } from './EventExpiryCountdown';
 
 interface OrganiserViewProps {
   events: ManagedEventSummary[];
   selectedEvent: ManagedEventSummary | null;
   participants: ParticipantRecord[];
+  submissions: OrganiserGallerySubmission[];
   isLoadingEvents: boolean;
+  isLoadingGallery: boolean;
+  galleryError: string | null;
+  verifyingKeys: Record<string, boolean>;
   isCreatingEvent: boolean;
   closingEventId: string | null;
   actionError: string | null;
   onCreateNewEvent: (title?: string) => Promise<void>;
-  onUpdateEventTitle: (managementCode: string, title: string) => Promise<void>;
-  onCloseEvent: (managementCode: string, eventId: string) => Promise<void>;
-  onSelectEvent: (managementCode: string) => void;
+  onUpdateEventTitle: (eventId: string, title: string) => Promise<void>;
+  onCloseEvent: (eventId: string) => Promise<void>;
+  onSelectEvent: (eventId: string) => void;
   onSwitchManagementCode: () => void;
-  onToggleAllowReplay: (managementCode: string, allowReplay: boolean) => Promise<void>;
+  onToggleAllowReplay: (eventId: string, allowReplay: boolean) => Promise<void>;
+  onRefreshGallery: () => void;
+  onVerifySubmission: (
+    participantId: string,
+    challengeId: number,
+    status: Exclude<VerificationStatus, 'pending'>,
+    rejectionReason?: string,
+  ) => Promise<void>;
   onRequestResetEvent: () => void;
   onClearError: () => void;
   onBackHome: () => void;
@@ -46,7 +66,11 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
   events,
   selectedEvent,
   participants,
+  submissions,
   isLoadingEvents,
+  isLoadingGallery,
+  galleryError,
+  verifyingKeys,
   isCreatingEvent,
   closingEventId,
   actionError,
@@ -56,6 +80,8 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
   onSelectEvent,
   onSwitchManagementCode,
   onToggleAllowReplay,
+  onRefreshGallery,
+  onVerifySubmission,
   onRequestResetEvent,
   onClearError,
   onBackHome,
@@ -69,17 +95,21 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
   const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
 
   const leaderboardSectionRef = useRef<HTMLElement | null>(null);
+  const gallerySectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setEditTitle(selectedEvent?.title ?? '');
     setTitleSaved(false);
   }, [selectedEvent?.id, selectedEvent?.title]);
 
+  const selectedStatus = selectedEvent ? getEffectiveEventStatus(selectedEvent) : null;
+  const isSelectedEventEditable = selectedStatus === 'active';
+
   const handleReplayToggle = async () => {
-    if (!selectedEvent || isUpdatingSettings) return;
+    if (!selectedEvent || isUpdatingSettings || !isSelectedEventEditable) return;
     setIsUpdatingSettings(true);
     try {
-      await onToggleAllowReplay(selectedEvent.management_code, !selectedEvent.allow_replay);
+      await onToggleAllowReplay(selectedEvent.id, !selectedEvent.allow_replay);
     } finally {
       setIsUpdatingSettings(false);
     }
@@ -95,12 +125,12 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
 
   const handleSaveTitle = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedEvent || isSavingTitle) return;
+    if (!selectedEvent || isSavingTitle || !isSelectedEventEditable) return;
     onClearError();
     setIsSavingTitle(true);
     try {
       await onUpdateEventTitle(
-        selectedEvent.management_code,
+        selectedEvent.id,
         editTitle.trim() || 'Human Bingo Networking Challenge',
       );
       setTitleSaved(true);
@@ -122,21 +152,69 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
     }
   };
 
-  const handleViewEventLeaderboard = (managementCode: string) => {
-    onSelectEvent(managementCode);
+  const handleViewEventLeaderboard = (eventId: string) => {
+    onSelectEvent(eventId);
     window.setTimeout(() => {
       leaderboardSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 60);
   };
 
-  const totalRegistered = participants.length;
-  const completedList = rankCompletedParticipants(participants);
-  const completedCount = completedList.length;
-  const currentlyPlaying = totalRegistered - completedCount;
+  const submissionStatsByParticipant = React.useMemo(() => {
+    const map = new Map<
+      string,
+      { submitted: number; pending: number; rejected: number }
+    >();
+    for (const sub of submissions) {
+      const current = map.get(sub.participant_id) ?? {
+        submitted: 0,
+        pending: 0,
+        rejected: 0,
+      };
+      if (sub.verification_status === 'pending' || sub.verification_status === 'approved') {
+        current.submitted += 1;
+      }
+      if (sub.verification_status === 'pending') {
+        current.pending += 1;
+      } else if (sub.verification_status === 'rejected') {
+        current.rejected += 1;
+      }
+      map.set(sub.participant_id, current);
+    }
+    return map;
+  }, [submissions]);
 
-  const sortedProgress = [...participants].sort((a, b) => {
+  const enrichedParticipants = React.useMemo(
+    () =>
+      participants.map((p) => {
+        const derived = submissionStatsByParticipant.get(p.id);
+        return {
+          ...p,
+          submitted_count: p.submitted_count ?? derived?.submitted ?? p.completed_count,
+          pending_count: p.pending_count ?? derived?.pending ?? 0,
+          rejected_count: p.rejected_count ?? derived?.rejected ?? 0,
+        };
+      }),
+    [participants, submissionStatsByParticipant],
+  );
+
+  const totalRegistered = enrichedParticipants.length;
+  const completedList = rankCompletedParticipants(enrichedParticipants);
+  const completedCount = completedList.length;
+  const allUploadedCount = enrichedParticipants.filter(
+    (p) => (p.submitted_count ?? p.completed_count) === 9,
+  ).length;
+  const pendingPhotoReviews = submissions.filter(
+    (s) => s.verification_status === 'pending',
+  ).length;
+
+  const sortedProgress = [...enrichedParticipants].sort((a, b) => {
     if (b.completed_count !== a.completed_count) {
       return b.completed_count - a.completed_count;
+    }
+    const subA = a.submitted_count ?? a.completed_count;
+    const subB = b.submitted_count ?? b.completed_count;
+    if (subB !== subA) {
+      return subB - subA;
     }
     return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
   });
@@ -170,7 +248,7 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
             className="min-h-[40px] px-3 py-2 rounded-xl border border-[#DCE3EC] bg-white hover:bg-[#EAEFF6] text-xs font-semibold text-[#142B49] inline-flex items-center gap-1.5 cursor-pointer"
           >
             <KeyRound className="w-3.5 h-3.5 text-[#258A83]" aria-hidden="true" />
-            <span>Enter Another Management Code</span>
+            <span>Unlock Another Event</span>
           </button>
         </header>
 
@@ -184,33 +262,51 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
           </div>
         )}
 
-        {/* Selected Managed Event Codes & Details */}
-        {selectedEvent && (
+        {/* Selected Managed Event Details (Private Management Code intentionally hidden) */}
+        {selectedEvent && selectedStatus && (
           <section className="rounded-2xl sm:rounded-3xl bg-[#FBF6EE] border border-[#EAE0CF] p-4 sm:p-5 shadow-[0_6px_22px_rgba(20,43,73,0.05)]">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] font-bold tracking-[0.18em] text-[#258A83]">
                   MANAGING EVENT
                 </span>
                 <span
                   className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                    selectedEvent.status === 'active'
+                    selectedStatus === 'active'
                       ? 'bg-[#CFE2D3]/70 text-[#1E6245]'
-                      : 'bg-[#E6ECF3] text-[#4F627A]'
+                      : selectedStatus === 'expired'
+                        ? 'bg-[#FCE8E3] text-[#A63A24]'
+                        : 'bg-[#E6ECF3] text-[#4F627A]'
                   }`}
                 >
-                  {selectedEvent.status === 'active' ? 'Active' : 'Closed'}
+                  {selectedStatus === 'active'
+                    ? 'Active'
+                    : selectedStatus === 'expired'
+                      ? 'Expired'
+                      : 'Closed'}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#4F627A]">
+                  <Clock className="w-3 h-3 text-[#7D6E5D]" aria-hidden="true" />
+                  <span>
+                    {selectedStatus === 'expired' ? 'Expired on ' : 'Expires '}
+                    {new Date(selectedEvent.expires_at).toLocaleString([], {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
                 </span>
               </div>
 
-              {selectedEvent.status === 'active' &&
+              {selectedStatus === 'active' &&
                 (confirmCloseId === selectedEvent.id ? (
                   <div className="inline-flex items-center gap-1.5">
                     <button
                       type="button"
                       disabled={closingEventId === selectedEvent.id}
                       onClick={async () => {
-                        await onCloseEvent(selectedEvent.management_code, selectedEvent.id);
+                        await onCloseEvent(selectedEvent.id);
                         setConfirmCloseId(null);
                       }}
                       className="min-h-[36px] px-3 py-1.5 rounded-xl bg-[#E25546] hover:bg-[#C94335] text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer disabled:opacity-60"
@@ -242,13 +338,33 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                 ))}
             </div>
 
+            <div className="mb-3">
+              <EventExpiryCountdown
+                expiresAt={selectedEvent.expires_at}
+                status={selectedStatus}
+                variant="compact"
+              />
+            </div>
+
+            {selectedStatus === 'expired' && (
+              <div className="mb-3 rounded-xl border border-[#F08B76]/50 bg-[#FDF5F3] px-3 py-2 text-xs font-medium text-[#A63A24]">
+                This event has expired after 48 hours. New joins, photo uploads, challenge submissions, and event edits are locked. You can review all historical results and submitted photos below.
+              </div>
+            )}
+
+            {selectedStatus === 'closed' && (
+              <div className="mb-3 rounded-xl border border-[#DCE3EC] bg-[#F5F7FA] px-3 py-2 text-xs font-medium text-[#4F627A]">
+                This event is closed. New joins, photo uploads, challenge submissions, and event edits are locked. Historical records remain available below.
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="rounded-2xl bg-white border border-[#EAE0CF] p-3.5 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold tracking-wider uppercase text-[#258A83]">
                     Public Joining Code
                   </p>
-                  <p className="font-mono text-lg sm:text-xl font-extrabold text-[#142B49] mt-0.5 truncate select-all">
+                  <p className="font-mono text-2xl font-extrabold tracking-[0.2em] text-[#142B49] mt-0.5 truncate select-all">
                     {selectedEvent.joining_code}
                   </p>
                 </div>
@@ -277,34 +393,15 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold tracking-wider uppercase text-[#8CE0D9] inline-flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3" aria-hidden="true" />
-                    <span>Private Management Code</span>
+                    <span>Private Management Access</span>
                   </p>
-                  <p className="font-mono text-base sm:text-lg font-extrabold mt-0.5 truncate select-all">
-                    {selectedEvent.management_code}
+                  <p className="text-xs font-semibold text-white/90 mt-1">
+                    Unlocked with your 4-digit private management code
+                  </p>
+                  <p className="text-[10.5px] text-white/65 mt-0.5">
+                    Hidden from view for event security
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleCopyCode(
-                      `mgmt-${selectedEvent.id}`,
-                      selectedEvent.management_code,
-                    )
-                  }
-                  className="min-h-[36px] px-3 py-1.5 rounded-xl bg-white/12 hover:bg-white/20 text-xs font-bold text-white inline-flex items-center gap-1 shrink-0 cursor-pointer"
-                >
-                  {copiedKey === `mgmt-${selectedEvent.id}` ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-[#8CE0D9]" aria-hidden="true" />
-                      <span className="text-[#8CE0D9]">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-[#8CE0D9]" aria-hidden="true" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
               </div>
             </div>
 
@@ -317,14 +414,15 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                   if (titleSaved) setTitleSaved(false);
                 }}
                 maxLength={100}
+                disabled={!isSelectedEventEditable || isSavingTitle}
                 aria-label="Event name"
                 placeholder="Event name (optional)"
-                className="flex-1 min-h-[40px] rounded-xl border border-[#DCE3EC] bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-[#142B49] focus:outline-none focus:border-[#258A83]"
+                className="flex-1 min-h-[40px] rounded-xl border border-[#DCE3EC] bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-[#142B49] focus:outline-none focus:border-[#258A83] disabled:bg-[#F5F7FA] disabled:text-[#7D6E5D]"
               />
               <button
                 type="submit"
-                disabled={isSavingTitle}
-                className="min-h-[40px] px-3.5 py-1.5 rounded-xl border border-[#DCE3EC] bg-white hover:bg-[#EAEFF6] text-xs font-bold text-[#142B49] inline-flex items-center gap-1 whitespace-nowrap cursor-pointer disabled:opacity-60"
+                disabled={!isSelectedEventEditable || isSavingTitle}
+                className="min-h-[40px] px-3.5 py-1.5 rounded-xl border border-[#DCE3EC] bg-white hover:bg-[#EAEFF6] text-xs font-bold text-[#142B49] inline-flex items-center gap-1 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingTitle ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -343,7 +441,7 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
 
         {/* Summary Stats */}
         {selectedEvent && (
-          <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
+          <section className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             <div className="rounded-2xl bg-white border border-[#DCE3EC] p-3 sm:p-4">
               <span className="text-[11px] font-semibold text-[#4F627A] block">
                 Total Registered
@@ -352,17 +450,37 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                 {totalRegistered}
               </span>
             </div>
+            <button
+              type="button"
+              onClick={() =>
+                gallerySectionRef.current?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                })
+              }
+              className="rounded-2xl bg-[#FFFBEB] border border-[#F5D67B] p-3 sm:p-4 text-left hover:bg-[#FEF3C7]/70 transition-colors cursor-pointer"
+            >
+              <span className="text-[11px] font-semibold text-[#9A5B13] block">
+                Pending Photo Reviews
+              </span>
+              <span className="font-display text-xl sm:text-2xl font-extrabold tabular-nums text-[#C87A18] mt-1 block">
+                {pendingPhotoReviews}
+              </span>
+            </button>
             <div className="rounded-2xl bg-white border border-[#DCE3EC] p-3 sm:p-4">
               <span className="text-[11px] font-semibold text-[#4F627A] block">
-                Currently Playing
+                All 9 Uploaded
               </span>
               <span className="font-display text-xl sm:text-2xl font-extrabold tabular-nums text-[#E25546] mt-1 block">
-                {currentlyPlaying}
+                {allUploadedCount}
+              </span>
+              <span className="text-[10.5px] font-medium text-[#7D6E5D] tabular-nums">
+                {submissions.length} total photos
               </span>
             </div>
             <div className="rounded-2xl bg-white border border-[#DCE3EC] p-3 sm:p-4">
               <span className="text-[11px] font-semibold text-[#4F627A] block">
-                Completed 9/9
+                Verified 9/9
               </span>
               <span className="font-display text-xl sm:text-2xl font-extrabold tabular-nums text-[#258A83] mt-1 block">
                 {completedCount}
@@ -379,13 +497,17 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                 id="allow-replay-toggle"
                 type="checkbox"
                 checked={Boolean(selectedEvent.allow_replay)}
-                disabled={isUpdatingSettings}
+                disabled={isUpdatingSettings || !isSelectedEventEditable}
                 onChange={handleReplayToggle}
-                className="w-4 h-4 accent-[#258A83] cursor-pointer"
+                className="w-4 h-4 accent-[#258A83] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <label
                 htmlFor="allow-replay-toggle"
-                className="text-xs sm:text-sm font-semibold text-[#142B49] cursor-pointer"
+                className={`text-xs sm:text-sm font-semibold ${
+                  isSelectedEventEditable
+                    ? 'text-[#142B49] cursor-pointer'
+                    : 'text-[#7D6E5D] cursor-not-allowed'
+                }`}
               >
                 Permit participants to start another challenge after finishing
               </label>
@@ -401,6 +523,22 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
               <span>Reset Event Leaderboard</span>
             </button>
           </section>
+        )}
+
+        {/* Participant Photo Verification Gallery */}
+        {selectedEvent && (
+          <div ref={gallerySectionRef}>
+            <OrganiserPhotoGallery
+              eventJoiningCode={selectedEvent.joining_code}
+              participants={participants}
+              submissions={submissions}
+              isLoading={isLoadingGallery}
+              errorMessage={galleryError}
+              verifyingKeys={verifyingKeys}
+              onRefresh={onRefreshGallery}
+              onVerifySubmission={onVerifySubmission}
+            />
+          </div>
         )}
 
         {/* Leaderboard Sorted by Completion Timestamp */}
@@ -478,11 +616,14 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
             ) : (
               <div className="flex flex-col divide-y divide-[#EEF2F6]">
                 {sortedProgress.map((p) => {
-                  const pct = Math.round((p.completed_count / 9) * 100);
+                  const uploadedCnt = p.submitted_count ?? p.completed_count;
+                  const verifiedPct = Math.round((p.completed_count / 9) * 100);
+                  const pendingCnt = p.pending_count ?? 0;
+                  const rejectedCnt = p.rejected_count ?? 0;
                   return (
                     <div
                       key={p.id}
-                      className="py-2.5 flex items-center justify-between gap-3 text-xs sm:text-sm"
+                      className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm"
                     >
                       <div className="min-w-0">
                         <p className="font-semibold text-[#142B49] truncate">
@@ -494,18 +635,26 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
+                          {pendingCnt > 0 ? ` · ${pendingCnt} pending` : ''}
+                          {rejectedCnt > 0 ? ` · ${rejectedCnt} rejected` : ''}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2.5 shrink-0 tabular-nums">
-                        <span className="font-bold text-[#142B49]">
-                          {p.completed_count}/9
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 tabular-nums text-xs">
+                        <span className="rounded-md bg-[#F5F7FA] border border-[#DCE3EC] px-2 py-0.5 font-semibold text-[#142B49]">
+                          Uploaded {uploadedCnt}/9
                         </span>
-                        <span className="text-[#4F627A]">({pct}%)</span>
+                        <span className="rounded-md bg-[#F2FAF8] border border-[#B8D1BE] px-2 py-0.5 font-bold text-[#258A83]">
+                          Verified {p.completed_count}/9 ({verifiedPct}%)
+                        </span>
                         {p.is_completed ? (
                           <CheckCircle2
                             className="w-4 h-4 text-[#258A83]"
-                            aria-label="Completed"
+                            aria-label="Verified Completed"
                           />
+                        ) : uploadedCnt === 9 ? (
+                          <span className="text-[11px] font-bold text-[#9A5B13]">
+                            All 9 Uploaded
+                          </span>
                         ) : (
                           <span className="text-[11px] font-semibold text-[#7D6E5D]">
                             Playing
@@ -520,13 +669,13 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
           </section>
         )}
 
-        {/* Create Another Event + Event History */}
+        {/* Create Another Event + Event History (Unlocked in this session) */}
         <section className="rounded-2xl bg-white border border-[#DCE3EC] p-4">
           <div className="flex items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
               <History className="w-4 h-4 text-[#258A83]" aria-hidden="true" />
               <h2 className="text-sm sm:text-base font-bold text-[#142B49]">
-                Event History
+                Unlocked Event History
               </h2>
             </div>
             {isLoadingEvents && (
@@ -569,13 +718,14 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
 
           {events.length === 0 ? (
             <p className="text-xs sm:text-sm text-[#4F627A] py-2">
-              No managed events recorded on this device yet.
+              No unlocked events in this session yet.
             </p>
           ) : (
             <div className="flex flex-col gap-2.5">
               {events.map((evt) => {
                 const isSelected = selectedEvent?.id === evt.id;
-                const isActive = evt.status === 'active';
+                const evtStatus = getEffectiveEventStatus(evt);
+                const isActive = evtStatus === 'active';
                 const isClosingThis = closingEventId === evt.id;
 
                 return (
@@ -595,12 +745,18 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                           </span>
                           <span
                             className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              isActive
+                              evtStatus === 'active'
                                 ? 'bg-[#CFE2D3]/70 text-[#1E6245]'
-                                : 'bg-[#E6ECF3] text-[#4F627A]'
+                                : evtStatus === 'expired'
+                                  ? 'bg-[#FCE8E3] text-[#A63A24]'
+                                  : 'bg-[#E6ECF3] text-[#4F627A]'
                             }`}
                           >
-                            {isActive ? 'Active' : 'Closed'}
+                            {evtStatus === 'active'
+                              ? 'Active'
+                              : evtStatus === 'expired'
+                                ? 'Expired'
+                                : 'Closed'}
                           </span>
                           {isSelected && (
                             <span className="text-[10px] font-bold text-[#258A83]">
@@ -660,7 +816,7 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => handleViewEventLeaderboard(evt.management_code)}
+                          onClick={() => handleViewEventLeaderboard(evt.id)}
                           className={`min-h-[34px] px-2.5 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
                             isSelected
                               ? 'bg-[#142B49] text-white'
@@ -678,7 +834,7 @@ export const OrganiserView: React.FC<OrganiserViewProps> = ({
                                 type="button"
                                 disabled={isClosingThis}
                                 onClick={async () => {
-                                  await onCloseEvent(evt.management_code, evt.id);
+                                  await onCloseEvent(evt.id);
                                   setConfirmCloseId(null);
                                 }}
                                 className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#E25546] hover:bg-[#C94335] text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer disabled:opacity-60"

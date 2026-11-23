@@ -25,8 +25,8 @@ export const JoinEventScreen: React.FC<JoinEventScreenProps> = ({
     if (isValidating) return;
 
     const normalized = normalizeJoiningCode(joiningCode);
-    if (normalized.length < 4) {
-      setValidationError('Please enter a valid event joining code.');
+    if (!/^\d{4}$/.test(normalized)) {
+      setValidationError('Please enter the 4-digit numeric joining code (e.g. 4821).');
       return;
     }
 
@@ -70,7 +70,7 @@ export const JoinEventScreen: React.FC<JoinEventScreenProps> = ({
               JOIN A HUMAN BINGO EVENT
             </h1>
             <p className="text-sm sm:text-base font-medium text-[#4F627A] mt-1.5">
-              Enter the joining code provided by your event host.
+              Enter the 4-digit joining code provided by your event host.
             </p>
           </header>
 
@@ -80,7 +80,7 @@ export const JoinEventScreen: React.FC<JoinEventScreenProps> = ({
                 htmlFor="event-joining-code"
                 className="block text-xs font-bold text-[#142B49] mb-1.5"
               >
-                Event Joining Code <span className="text-[#E25546]">*</span>
+                4-Digit Joining Code <span className="text-[#E25546]">*</span>
               </label>
               <div className="relative">
                 <KeyRound
@@ -90,20 +90,21 @@ export const JoinEventScreen: React.FC<JoinEventScreenProps> = ({
                 <input
                   id="event-joining-code"
                   type="text"
+                  inputMode="numeric"
                   required
                   autoComplete="off"
-                  autoCapitalize="characters"
                   spellCheck={false}
-                  maxLength={32}
+                  maxLength={4}
                   value={joiningCode}
                   onChange={(e) => {
-                    setJoiningCode(e.target.value.toUpperCase());
+                    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setJoiningCode(digitsOnly);
                     if (validationError) setValidationError(null);
                     if (errorMessage) onClearError();
                   }}
-                  placeholder="e.g. HB-2026-A7K9"
+                  placeholder="e.g. 4821"
                   disabled={isValidating}
-                  className="w-full min-h-[48px] rounded-xl border border-[#DCE3EC] bg-white pl-10 pr-3.5 py-2.5 text-sm sm:text-base font-mono font-bold tracking-wider text-[#142B49] uppercase placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:normal-case placeholder:text-[#8A9BAE] focus:outline-none focus:border-[#258A83] focus:ring-2 focus:ring-[#258A83]/20 disabled:opacity-60"
+                  className="w-full min-h-[48px] rounded-xl border border-[#DCE3EC] bg-white pl-10 pr-3.5 py-2.5 text-base font-mono font-bold tracking-[0.25em] text-[#142B49] placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-[#8A9BAE] focus:outline-none focus:border-[#258A83] focus:ring-2 focus:ring-[#258A83]/20 disabled:opacity-60"
                 />
               </div>
             </div>

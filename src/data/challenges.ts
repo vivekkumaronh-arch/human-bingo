@@ -1,3 +1,5 @@
+import type { VerificationStatus } from '../types/multiplayer';
+
 export interface ChallengeItem {
   id: number;
   numberLabel: string;
@@ -8,8 +10,13 @@ export interface ChallengeItem {
 
 export interface UploadedPhoto {
   dataUrl: string;
+  storagePath?: string;
   fileName: string;
   updatedAt: number;
+  verificationStatus?: VerificationStatus;
+  rejectionReason?: string | null;
+  submittedAt?: string;
+  reviewedAt?: string | null;
 }
 
 export type ChallengePhotoMap = Record<number, UploadedPhoto>;

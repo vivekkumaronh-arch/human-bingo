@@ -108,3 +108,31 @@ export async function processImageLocally(file: File): Promise<UploadedPhoto> {
     };
   }
 }
+
+export function dataUrlToUploadPayload(dataUrl: string): {
+  blob: Blob;
+  contentType: 'image/jpeg' | 'image/png';
+  extension: 'jpg' | 'png';
+} {
+  const match = /^data:(image\/(?:jpeg|jpg|png));base64,(.+)$/i.exec(dataUrl);
+  if (!match) {
+    throw new Error('Invalid processed image format. Please use JPG or PNG.');
+  }
+
+  const rawMime = match[1].toLowerCase();
+  const isPng = rawMime === 'image/png';
+  const contentType: 'image/jpeg' | 'image/png' = isPng ? 'image/png' : 'image/jpeg';
+  const extension: 'jpg' | 'png' = isPng ? 'png' : 'jpg';
+
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return {
+    blob: new Blob([bytes], { type: contentType }),
+    contentType,
+    extension,
+  };
+}

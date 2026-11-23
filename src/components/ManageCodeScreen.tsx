@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
 import { normalizeManagementCode } from '../services/bingoApi';
-import type { ManagedEventSummary } from '../types/multiplayer';
 
 interface ManageCodeScreenProps {
   isValidating: boolean;
   errorMessage: string | null;
-  recentEvents: ManagedEventSummary[];
   onValidateManagementCode: (code: string) => Promise<void>;
-  onOpenRecentEvent: (event: ManagedEventSummary) => void;
   onClearError: () => void;
   onBack: () => void;
 }
@@ -16,9 +13,7 @@ interface ManageCodeScreenProps {
 export const ManageCodeScreen: React.FC<ManageCodeScreenProps> = ({
   isValidating,
   errorMessage,
-  recentEvents,
   onValidateManagementCode,
-  onOpenRecentEvent,
   onClearError,
   onBack,
 }) => {
@@ -30,8 +25,8 @@ export const ManageCodeScreen: React.FC<ManageCodeScreenProps> = ({
     if (isValidating) return;
 
     const normalized = normalizeManagementCode(managementCode);
-    if (normalized.length < 8) {
-      setValidationError('Please enter your private management code.');
+    if (!/^\d{4}$/.test(normalized) && !/^MGT-[A-Z0-9-]+$/.test(normalized)) {
+      setValidationError('Please enter your 4-digit private management code.');
       return;
     }
 
@@ -64,7 +59,7 @@ export const ManageCodeScreen: React.FC<ManageCodeScreenProps> = ({
             Manage Existing Event
           </h1>
           <p className="text-xs sm:text-sm text-[#4F627A] mt-1">
-            Enter the private management code generated when your event was created.
+            Enter the 4-digit private management code generated when your event was created.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3.5" noValidate>
@@ -73,7 +68,7 @@ export const ManageCodeScreen: React.FC<ManageCodeScreenProps> = ({
                 htmlFor="private-management-code"
                 className="block text-xs font-bold text-[#142B49] mb-1.5"
               >
-                Private Management Code <span className="text-[#E25546]">*</span>
+                4-Digit Private Management Code <span className="text-[#E25546]">*</span>
               </label>
               <div className="relative">
                 <KeyRound
@@ -82,21 +77,21 @@ export const ManageCodeScreen: React.FC<ManageCodeScreenProps> = ({
                 />
                 <input
                   id="private-management-code"
-                  type="text"
+                  type="password"
+                  inputMode="numeric"
                   required
                   autoComplete="off"
-                  autoCapitalize="characters"
                   spellCheck={false}
                   maxLength={32}
                   value={managementCode}
                   onChange={(e) => {
-                    setManagementCode(e.target.value.toUpperCase());
+                    setManagementCode(e.target.value.toUpperCase().replace(/\s+/g, ''));
                     if (validationError) setValidationError(null);
                     if (errorMessage) onClearError();
                   }}
-                  placeholder="e.g. MGT-8F2K-9Q3P"
+                  placeholder="Enter 4-digit code (e.g. 7392)"
                   disabled={isValidating}
-                  className="w-full min-h-[48px] rounded-xl border border-[#DCE3EC] bg-[#F5F7FA] pl-10 pr-3.5 py-2.5 text-sm sm:text-base font-mono font-bold tracking-wider text-[#142B49] uppercase placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:normal-case placeholder:text-[#8A9BAE] focus:bg-white focus:outline-none focus:border-[#258A83] focus:ring-2 focus:ring-[#258A83]/20 disabled:opacity-60"
+                  className="w-full min-h-[48px] rounded-xl border border-[#DCE3EC] bg-[#F5F7FA] pl-10 pr-3.5 py-2.5 text-base font-mono font-bold tracking-[0.25em] text-[#142B49] placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-[#8A9BAE] focus:bg-white focus:outline-none focus:border-[#258A83] focus:ring-2 focus:ring-[#258A83]/20 disabled:opacity-60"
                 />
               </div>
             </div>
@@ -128,42 +123,6 @@ export const ManageCodeScreen: React.FC<ManageCodeScreenProps> = ({
               )}
             </button>
           </form>
-
-          {recentEvents.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-[#EEF2F6]">
-              <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#7D6E5D] mb-2">
-                Events Created on This Device
-              </p>
-              <div className="flex flex-col gap-2">
-                {recentEvents.map((evt) => (
-                  <button
-                    key={evt.id}
-                    type="button"
-                    onClick={() => onOpenRecentEvent(evt)}
-                    className="w-full rounded-xl border border-[#DCE3EC] bg-[#F5F7FA] hover:bg-[#EAEFF6] px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-[#142B49] truncate">
-                        {evt.title}
-                      </p>
-                      <p className="text-[11px] font-mono text-[#4F627A]">
-                        {evt.joining_code} · {evt.participant_count} joined
-                      </p>
-                    </div>
-                    <span
-                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md shrink-0 ${
-                        evt.status === 'active'
-                          ? 'bg-[#CFE2D3]/70 text-[#1E6245]'
-                          : 'bg-[#E6ECF3] text-[#4F627A]'
-                      }`}
-                    >
-                      {evt.status === 'active' ? 'Active' : 'Closed'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

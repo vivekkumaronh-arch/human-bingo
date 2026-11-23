@@ -7,6 +7,7 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+import { getEffectiveEventStatus } from '../services/bingoApi';
 import type { EventConfig } from '../types/multiplayer';
 
 interface RegistrationScreenProps {
@@ -33,7 +34,9 @@ export const RegistrationScreen: React.FC<RegistrationScreenProps> = ({
   const [fullName, setFullName] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const isClosed = activeEvent.status !== 'active';
+  const effectiveStatus = getEffectiveEventStatus(activeEvent);
+  const isExpired = effectiveStatus === 'expired';
+  const isClosed = effectiveStatus !== 'active';
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -56,9 +59,11 @@ export const RegistrationScreen: React.FC<RegistrationScreenProps> = ({
   const displayError =
     validationError ||
     errorMessage ||
-    (isClosed
-      ? 'This event has been closed and is no longer accepting new participants.'
-      : null);
+    (isExpired
+      ? 'This event has expired.'
+      : isClosed
+        ? 'This event has been closed and is no longer accepting new participants.'
+        : null);
 
   return (
     <div className="min-h-dvh w-full bg-[#F5F7FA] text-[#142B49] flex flex-col items-center justify-center px-4 py-6">
